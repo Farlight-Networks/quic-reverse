@@ -9,7 +9,7 @@
 
 A Rust library for reverse-initiated, multiplexed streams over QUIC.
 
-quic-reverse solves the "reverse connection" problem: allowing services behind NAT or firewalls to accept incoming connections without exposing a public port. The library handles connection negotiation, stream lifecycle management, and multiplexing while staying out of authentication, certificate management, and application-level protocols.
+quic-reverse helps with the "reverse connection" problem: allowing services behind NAT or firewalls to accept incoming connections without exposing a public port. The library handles connection negotiation, stream lifecycle management, and multiplexing while staying out of authentication, certificate management, and application-level protocols.
 
 ## What can you build with quic-reverse?
 
