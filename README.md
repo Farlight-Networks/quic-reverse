@@ -234,7 +234,7 @@ Log levels follow this convention:
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Design rationale and architectural decisions
 - [PROTOCOL.md](PROTOCOL.md) - Wire protocol specification
-- [Examples README](crates/quic-reverse/examples/README.md) - Example documentation
+- [Examples](crates/quic-reverse/examples/EXAMPLE.md) - Example documentation
 
 ## License
 
