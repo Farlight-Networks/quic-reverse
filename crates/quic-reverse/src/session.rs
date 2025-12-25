@@ -1634,4 +1634,215 @@ mod tests {
             other => panic!("expected Ping timeout, got: {other:?}"),
         }
     }
+
+    /// Stress tests for concurrent stream handling.
+    mod stress_tests {
+        use super::*;
+
+        /// Tests many sequential open requests to verify registry handling.
+        #[tokio::test]
+        async fn many_sequential_opens() {
+            const NUM_OPENS: usize = 20;
+
+            let (conn_client, conn_server) = mock_connection_pair();
+
+            let client_config = Config::new().with_max_inflight_opens(NUM_OPENS);
+            let server_config = Config::new();
+
+            let client_session = Session::new(conn_client, Role::Client, client_config);
+            let server_session = Session::new(conn_server, Role::Server, server_config);
+
+            let client_start = tokio::spawn(async move { client_session.start().await });
+            let server_start = tokio::spawn(async move { server_session.start().await });
+
+            let client_handle = client_start.await.unwrap().unwrap();
+            let mut server_handle = server_start.await.unwrap().unwrap();
+
+            let client_inner = Arc::clone(&client_handle.inner);
+            let mut client_writer = client_handle.writer;
+            let mut client_reader = client_handle.reader;
+
+            // Client: send open requests
+            let client_sender = tokio::spawn(async move {
+                for i in 0..NUM_OPENS {
+                    let (response_tx, _response_rx) = oneshot::channel();
+                    let request_id = {
+                        let mut registry = client_inner.registry.lock().unwrap();
+                        let request_id = registry.next_request_id();
+                        let request =
+                            OpenRequest::new(request_id, format!("service-{i}"));
+                        let _ = registry.register_pending(&request, response_tx);
+                        request_id
+                    };
+
+                    let request = OpenRequest::new(request_id, format!("service-{i}"));
+                    client_writer
+                        .write_message(&ProtocolMessage::OpenRequest(request))
+                        .await
+                        .unwrap();
+                }
+                client_writer.flush().await.unwrap();
+                NUM_OPENS
+            });
+
+            // Server: process and accept all opens
+            let server_processor = tokio::spawn(async move {
+                let mut accepted = 0;
+                for _ in 0..NUM_OPENS {
+                    match server_handle.process_message().await {
+                        Ok(Some(ControlEvent::OpenRequest { request_id, .. })) => {
+                            server_handle.accept_open(request_id, accepted as u64).await.ok();
+                            accepted += 1;
+                        }
+                        _ => break,
+                    }
+                }
+                accepted
+            });
+
+            // Client: receive responses
+            let client_receiver = tokio::spawn(async move {
+                let mut received = 0;
+                for _ in 0..NUM_OPENS {
+                    match client_reader.read_message().await {
+                        Ok(Some(ProtocolMessage::OpenResponse(_))) => received += 1,
+                        _ => break,
+                    }
+                }
+                received
+            });
+
+            let sent = client_sender.await.unwrap();
+            let accepted = server_processor.await.unwrap();
+            let received = client_receiver.await.unwrap();
+
+            assert_eq!(sent, NUM_OPENS);
+            assert_eq!(accepted, NUM_OPENS);
+            assert_eq!(received, NUM_OPENS);
+        }
+
+        /// Tests rapid sequential ping/pong exchanges.
+        #[tokio::test]
+        async fn sequential_ping_pong() {
+            const NUM_PINGS: usize = 10;
+
+            let (conn_client, conn_server) = mock_connection_pair();
+
+            let client_session = Session::new(conn_client, Role::Client, Config::new());
+            let server_session = Session::new(conn_server, Role::Server, Config::new());
+
+            let client_start = tokio::spawn(async move { client_session.start().await });
+            let server_start = tokio::spawn(async move { server_session.start().await });
+
+            let client_handle = client_start.await.unwrap().unwrap();
+            let mut server_handle = server_start.await.unwrap().unwrap();
+
+            let client_inner = Arc::clone(&client_handle.inner);
+            let mut client_writer = client_handle.writer;
+            let mut client_reader = client_handle.reader;
+
+            // Client: send pings and track them
+            let pings_sent = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let pings_sent_clone = Arc::clone(&pings_sent);
+
+            let client_sender = tokio::spawn(async move {
+                for _ in 0..NUM_PINGS {
+                    let sequence =
+                        client_inner.next_ping_seq.fetch_add(1, Ordering::SeqCst);
+                    let (response_tx, _) = oneshot::channel();
+                    {
+                        let mut pending = client_inner.pending_pings.lock().unwrap();
+                        pending.insert(
+                            sequence,
+                            PendingPing {
+                                sent_at: Instant::now(),
+                                response_tx,
+                            },
+                        );
+                    }
+                    let ping_msg = quic_reverse_control::Ping { sequence };
+                    client_writer
+                        .write_message(&ProtocolMessage::Ping(ping_msg))
+                        .await
+                        .unwrap();
+                    pings_sent_clone.fetch_add(1, Ordering::SeqCst);
+                }
+                client_writer.flush().await.unwrap();
+            });
+
+            // Server: process pings
+            let server_processor = tokio::spawn(async move {
+                let mut processed = 0;
+                for _ in 0..NUM_PINGS {
+                    match server_handle.process_message().await {
+                        Ok(Some(ControlEvent::Ping { .. })) => processed += 1,
+                        _ => break,
+                    }
+                }
+                processed
+            });
+
+            // Client: receive pongs
+            let client_receiver = tokio::spawn(async move {
+                let mut received = 0;
+                for _ in 0..NUM_PINGS {
+                    match client_reader.read_message().await {
+                        Ok(Some(ProtocolMessage::Pong(_))) => received += 1,
+                        _ => break,
+                    }
+                }
+                received
+            });
+
+            client_sender.await.unwrap();
+            let processed = server_processor.await.unwrap();
+            let received = client_receiver.await.unwrap();
+
+            assert_eq!(pings_sent.load(Ordering::SeqCst), NUM_PINGS);
+            assert_eq!(processed, NUM_PINGS);
+            assert_eq!(received, NUM_PINGS);
+        }
+
+        /// Tests high-volume registry operations.
+        #[tokio::test]
+        async fn registry_stress() {
+            use crate::registry::StreamRegistry;
+            use quic_reverse_control::ServiceId;
+
+            let mut registry = StreamRegistry::new(100, 100);
+            const NUM_OPS: usize = 100;
+
+            // Register many pending requests
+            for i in 0..NUM_OPS {
+                let (tx, _rx) = oneshot::channel();
+                let request = OpenRequest::new(i as u64, format!("svc-{i}"));
+                assert!(
+                    registry.register_pending(&request, tx).is_some(),
+                    "failed to register pending {i}"
+                );
+            }
+
+            // Take all pending and register as active
+            for i in 0..NUM_OPS {
+                let pending = registry.take_pending(i as u64);
+                assert!(pending.is_some(), "failed to take pending {i}");
+
+                let service = ServiceId::new(format!("svc-{i}"));
+                assert!(
+                    registry
+                        .register_active(i as u64, service, Metadata::Empty, i as u64)
+                        .is_some(),
+                    "failed to register active {i}"
+                );
+            }
+
+            // Remove all active
+            for i in 0..NUM_OPS {
+                registry.remove_active(i as u64);
+            }
+
+            // Registry should be empty now
+            assert!(registry.can_open());
+        }
+    }
 }

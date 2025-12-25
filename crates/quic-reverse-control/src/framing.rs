@@ -390,4 +390,66 @@ mod tests {
             Some(b"two".to_vec())
         );
     }
+
+    // Property-based tests
+    mod proptest_tests {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(1000))]
+
+            #[test]
+            fn frame_round_trip_arbitrary(payload in prop::collection::vec(any::<u8>(), 0..1024)) {
+                let encoded = encode_frame(&payload).expect("encode should succeed");
+                let decoded = decode_frame(&encoded).expect("decode should succeed");
+                prop_assert_eq!(payload, decoded);
+            }
+
+            #[test]
+            fn frame_reader_handles_arbitrary_payload(payload in prop::collection::vec(any::<u8>(), 0..1024)) {
+                let encoded = encode_frame(&payload).expect("encode should succeed");
+                let mut reader = FrameReader::new();
+                reader.extend(&encoded);
+                let result = reader.read_frame().expect("read should succeed");
+                prop_assert_eq!(result, Some(payload));
+            }
+
+            #[test]
+            fn frame_writer_produces_decodable_output(payloads in prop::collection::vec(prop::collection::vec(any::<u8>(), 0..256), 1..10)) {
+                let mut writer = FrameWriter::new();
+                for payload in &payloads {
+                    writer.write_frame(payload).expect("write should succeed");
+                }
+                let bytes = writer.take_bytes();
+
+                let mut reader = FrameReader::new();
+                reader.extend(&bytes);
+
+                for expected in payloads {
+                    let actual = reader.read_frame().expect("read should succeed");
+                    prop_assert_eq!(actual, Some(expected));
+                }
+            }
+
+            #[test]
+            fn incremental_feed_matches_bulk(payload in prop::collection::vec(any::<u8>(), 1..512)) {
+                let encoded = encode_frame(&payload).expect("encode should succeed");
+
+                // Bulk feed
+                let mut bulk_reader = FrameReader::new();
+                bulk_reader.extend(&encoded);
+                let bulk_result = bulk_reader.read_frame().expect("read should succeed");
+
+                // Incremental feed (byte by byte)
+                let mut inc_reader = FrameReader::new();
+                for &byte in &encoded {
+                    inc_reader.extend(&[byte]);
+                }
+                let inc_result = inc_reader.read_frame().expect("read should succeed");
+
+                prop_assert_eq!(bulk_result, inc_result);
+            }
+        }
+    }
 }

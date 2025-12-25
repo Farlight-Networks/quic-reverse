@@ -1,0 +1,38 @@
+[package]
+name = "quic-reverse-control-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+[dependencies.quic-reverse-control]
+path = ".."
+
+[[bin]]
+name = "fuzz_frame_decode"
+path = "fuzz_targets/fuzz_frame_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_message_decode"
+path = "fuzz_targets/fuzz_message_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_stream_bind"
+path = "fuzz_targets/fuzz_stream_bind.rs"
+test = false
+doc = false
+bench = false

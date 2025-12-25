@@ -450,6 +450,198 @@ impl StreamBind {
 mod tests {
     use super::*;
 
+    // Property-based testing with proptest
+    mod proptest_tests {
+        use super::*;
+        use crate::{BincodeCodec, Codec};
+        use proptest::prelude::*;
+
+        // Strategy for generating arbitrary Features
+        fn arb_features() -> impl Strategy<Value = Features> {
+            (0u32..8).prop_map(|bits| Features::from_bits_truncate(bits))
+        }
+
+        // Strategy for generating arbitrary OpenFlags
+        fn arb_open_flags() -> impl Strategy<Value = OpenFlags> {
+            (0u8..4).prop_map(|bits| OpenFlags::from_bits_truncate(bits))
+        }
+
+        // Strategy for generating arbitrary ServiceId
+        fn arb_service_id() -> impl Strategy<Value = ServiceId> {
+            "[a-z][a-z0-9_-]{0,31}".prop_map(ServiceId::new)
+        }
+
+        // Strategy for generating arbitrary MetadataValue
+        fn arb_metadata_value() -> impl Strategy<Value = MetadataValue> {
+            prop_oneof![
+                ".*".prop_map(MetadataValue::String),
+                any::<i64>().prop_map(MetadataValue::Integer),
+                any::<bool>().prop_map(MetadataValue::Boolean),
+                prop::collection::vec(any::<u8>(), 0..64).prop_map(MetadataValue::Bytes),
+            ]
+        }
+
+        // Strategy for generating arbitrary Metadata
+        fn arb_metadata() -> impl Strategy<Value = Metadata> {
+            prop_oneof![
+                Just(Metadata::Empty),
+                prop::collection::vec(any::<u8>(), 0..128).prop_map(Metadata::Bytes),
+                prop::collection::hash_map("[a-z]{1,16}", arb_metadata_value(), 0..8)
+                    .prop_map(Metadata::Structured),
+            ]
+        }
+
+        // Strategy for generating arbitrary RejectCode
+        fn arb_reject_code() -> impl Strategy<Value = RejectCode> {
+            prop_oneof![
+                Just(RejectCode::ServiceUnavailable),
+                Just(RejectCode::UnsupportedService),
+                Just(RejectCode::LimitExceeded),
+                Just(RejectCode::Unauthorized),
+                Just(RejectCode::InternalError),
+            ]
+        }
+
+        // Strategy for generating arbitrary CloseCode
+        fn arb_close_code() -> impl Strategy<Value = CloseCode> {
+            prop_oneof![
+                Just(CloseCode::Normal),
+                Just(CloseCode::Reset),
+                Just(CloseCode::Timeout),
+                Just(CloseCode::Error),
+            ]
+        }
+
+        // Strategy for generating arbitrary Hello
+        fn arb_hello() -> impl Strategy<Value = Hello> {
+            (arb_features(), proptest::option::of(".*")).prop_map(|(features, agent)| {
+                let mut hello = Hello::new(features);
+                hello.agent = agent;
+                hello
+            })
+        }
+
+        // Strategy for generating arbitrary HelloAck
+        fn arb_hello_ack() -> impl Strategy<Value = HelloAck> {
+            (any::<u16>(), arb_features()).prop_map(|(version, features)| HelloAck {
+                selected_version: version,
+                selected_features: features,
+            })
+        }
+
+        // Strategy for generating arbitrary OpenRequest
+        fn arb_open_request() -> impl Strategy<Value = OpenRequest> {
+            (any::<u64>(), arb_service_id(), arb_metadata(), arb_open_flags()).prop_map(
+                |(request_id, service, metadata, flags)| OpenRequest {
+                    request_id,
+                    service,
+                    metadata,
+                    flags,
+                },
+            )
+        }
+
+        // Strategy for generating arbitrary OpenResponse
+        fn arb_open_response() -> impl Strategy<Value = OpenResponse> {
+            (
+                any::<u64>(),
+                prop_oneof![
+                    Just(OpenStatus::Accepted),
+                    arb_reject_code().prop_map(OpenStatus::Rejected),
+                ],
+                proptest::option::of(".*"),
+                proptest::option::of(any::<u64>()),
+            )
+                .prop_map(|(request_id, status, reason, logical_stream_id)| {
+                    OpenResponse {
+                        request_id,
+                        status,
+                        reason,
+                        logical_stream_id,
+                    }
+                })
+        }
+
+        // Strategy for generating arbitrary StreamClose
+        fn arb_stream_close() -> impl Strategy<Value = StreamClose> {
+            (any::<u64>(), arb_close_code(), proptest::option::of(".*")).prop_map(
+                |(logical_stream_id, code, reason)| StreamClose {
+                    logical_stream_id,
+                    code,
+                    reason,
+                },
+            )
+        }
+
+        // Strategy for generating arbitrary Ping
+        fn arb_ping() -> impl Strategy<Value = Ping> {
+            any::<u64>().prop_map(|sequence| Ping { sequence })
+        }
+
+        // Strategy for generating arbitrary Pong
+        fn arb_pong() -> impl Strategy<Value = Pong> {
+            any::<u64>().prop_map(|sequence| Pong { sequence })
+        }
+
+        // Strategy for generating arbitrary ProtocolMessage
+        fn arb_protocol_message() -> impl Strategy<Value = ProtocolMessage> {
+            prop_oneof![
+                arb_hello().prop_map(ProtocolMessage::Hello),
+                arb_hello_ack().prop_map(ProtocolMessage::HelloAck),
+                arb_open_request().prop_map(ProtocolMessage::OpenRequest),
+                arb_open_response().prop_map(ProtocolMessage::OpenResponse),
+                arb_stream_close().prop_map(ProtocolMessage::StreamClose),
+                arb_ping().prop_map(ProtocolMessage::Ping),
+                arb_pong().prop_map(ProtocolMessage::Pong),
+            ]
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(1000))]
+
+            #[test]
+            fn protocol_message_round_trip(msg in arb_protocol_message()) {
+                let codec = BincodeCodec::new();
+                let encoded = codec.encode(&msg).expect("encoding should succeed");
+                let decoded: ProtocolMessage = codec.decode(&encoded).expect("decoding should succeed");
+                prop_assert_eq!(msg, decoded);
+            }
+
+            #[test]
+            fn hello_round_trip(msg in arb_hello()) {
+                let codec = BincodeCodec::new();
+                let wrapped = ProtocolMessage::Hello(msg.clone());
+                let encoded = codec.encode(&wrapped).expect("encoding should succeed");
+                let decoded: ProtocolMessage = codec.decode(&encoded).expect("decoding should succeed");
+                prop_assert_eq!(ProtocolMessage::Hello(msg), decoded);
+            }
+
+            #[test]
+            fn open_request_round_trip(msg in arb_open_request()) {
+                let codec = BincodeCodec::new();
+                let wrapped = ProtocolMessage::OpenRequest(msg.clone());
+                let encoded = codec.encode(&wrapped).expect("encoding should succeed");
+                let decoded: ProtocolMessage = codec.decode(&encoded).expect("decoding should succeed");
+                prop_assert_eq!(ProtocolMessage::OpenRequest(msg), decoded);
+            }
+
+            #[test]
+            fn stream_bind_round_trip(id in any::<u64>()) {
+                let bind = StreamBind::new(id);
+                let encoded = bind.encode();
+                let decoded = StreamBind::decode(&encoded).expect("decode should succeed");
+                prop_assert_eq!(bind.logical_stream_id, decoded.logical_stream_id);
+            }
+
+            #[test]
+            fn service_id_preserves_content(s in "[a-z][a-z0-9_-]{0,63}") {
+                let id = ServiceId::new(&s);
+                prop_assert_eq!(id.as_str(), s.as_str());
+                prop_assert_eq!(format!("{id}"), s);
+            }
+        }
+    }
+
     #[test]
     fn service_id_from_str() {
         let id: ServiceId = "ssh".into();

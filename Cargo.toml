@@ -5,6 +5,9 @@ members = [
     "crates/quic-reverse-control",
     "crates/quic-reverse-transport",
 ]
+exclude = [
+    "crates/quic-reverse-control/fuzz",
+]
 
 [workspace.package]
 version = "0.1.1"
