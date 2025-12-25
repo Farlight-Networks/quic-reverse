@@ -458,12 +458,12 @@ mod tests {
 
         // Strategy for generating arbitrary Features
         fn arb_features() -> impl Strategy<Value = Features> {
-            (0u32..8).prop_map(|bits| Features::from_bits_truncate(bits))
+            (0u32..8).prop_map(Features::from_bits_truncate)
         }
 
         // Strategy for generating arbitrary OpenFlags
         fn arb_open_flags() -> impl Strategy<Value = OpenFlags> {
-            (0u8..4).prop_map(|bits| OpenFlags::from_bits_truncate(bits))
+            (0u8..4).prop_map(OpenFlags::from_bits_truncate)
         }
 
         // Strategy for generating arbitrary ServiceId
@@ -531,14 +531,18 @@ mod tests {
 
         // Strategy for generating arbitrary OpenRequest
         fn arb_open_request() -> impl Strategy<Value = OpenRequest> {
-            (any::<u64>(), arb_service_id(), arb_metadata(), arb_open_flags()).prop_map(
-                |(request_id, service, metadata, flags)| OpenRequest {
+            (
+                any::<u64>(),
+                arb_service_id(),
+                arb_metadata(),
+                arb_open_flags(),
+            )
+                .prop_map(|(request_id, service, metadata, flags)| OpenRequest {
                     request_id,
                     service,
                     metadata,
                     flags,
-                },
-            )
+                })
         }
 
         // Strategy for generating arbitrary OpenResponse

@@ -1669,8 +1669,7 @@ mod tests {
                     let request_id = {
                         let mut registry = client_inner.registry.lock().unwrap();
                         let request_id = registry.next_request_id();
-                        let request =
-                            OpenRequest::new(request_id, format!("service-{i}"));
+                        let request = OpenRequest::new(request_id, format!("service-{i}"));
                         let _ = registry.register_pending(&request, response_tx);
                         request_id
                     };
@@ -1691,7 +1690,10 @@ mod tests {
                 for _ in 0..NUM_OPENS {
                     match server_handle.process_message().await {
                         Ok(Some(ControlEvent::OpenRequest { request_id, .. })) => {
-                            server_handle.accept_open(request_id, accepted as u64).await.ok();
+                            server_handle
+                                .accept_open(request_id, accepted as u64)
+                                .await
+                                .ok();
                             accepted += 1;
                         }
                         _ => break,
@@ -1747,8 +1749,7 @@ mod tests {
 
             let client_sender = tokio::spawn(async move {
                 for _ in 0..NUM_PINGS {
-                    let sequence =
-                        client_inner.next_ping_seq.fetch_add(1, Ordering::SeqCst);
+                    let sequence = client_inner.next_ping_seq.fetch_add(1, Ordering::SeqCst);
                     let (response_tx, _) = oneshot::channel();
                     {
                         let mut pending = client_inner.pending_pings.lock().unwrap();
