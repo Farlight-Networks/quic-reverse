@@ -1,0 +1,18 @@
+# Planning and design documents (private)
+planning/
+
+# Private upstream repository
+RelayKit/
+
+# Rust build artifacts
+target/
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store

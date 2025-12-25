@@ -1,0 +1,82 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/quic-reverse",
+    "crates/quic-reverse-control",
+    "crates/quic-reverse-transport",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "Apache-2.0"
+repository = "https://github.com/Farlight-Networks/quic-reverse"
+keywords = ["quic", "networking", "reverse-tunnel", "multiplexing"]
+categories = ["network-programming", "asynchronous"]
+
+[workspace.dependencies]
+# Internal crates
+quic-reverse = { version = "0.1.0", path = "crates/quic-reverse" }
+quic-reverse-control = { version = "0.1.0", path = "crates/quic-reverse-control" }
+quic-reverse-transport = { version = "0.1.0", path = "crates/quic-reverse-transport" }
+
+# Async runtime
+tokio = { version = "1.40", features = ["rt", "rt-multi-thread", "macros", "io-util", "sync", "time"] }
+
+# QUIC
+quinn = "0.11"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
+
+# Error handling
+thiserror = "1.0"
+
+# Utilities
+bytes = "1.7"
+bitflags = { version = "2.6", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
+
+# Certificate generation (for examples)
+rcgen = "0.13"
+
+# Testing
+tokio-test = "0.4"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+# Lint groups at lower priority so individual lints can override
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+
+# These lints are valuable for library code but too strict for tests/examples
+# We enforce them on library code via CI (cargo clippy --lib)
+unwrap_used = "allow"
+expect_used = "allow"
+
+# These nursery lints are too noisy or not applicable
+significant_drop_tightening = "allow"  # MutexGuard drop timing is intentional
+redundant_pub_crate = "allow"          # pub(crate) in private module documents intent
+
+# These pedantic lints have false positives or conflict with our style
+module_name_repetitions = "allow"      # QuicReverse::QuicReverseError is fine
+similar_names = "allow"                # send/recv, req/resp are intentional
+
+# Style preferences - these are too noisy for our codebase
+items_after_statements = "allow"       # Common pattern in tests
+single_char_pattern = "allow"          # ":" vs ':' is fine
+redundant_clone = "allow"              # Sometimes explicit for clarity
+if_not_else = "allow"                  # Negated conditions can be clearer
+cast_possible_truncation = "allow"     # We handle this case-by-case
+let_underscore_untyped = "allow"       # let _ = ... is fine
+uninlined_format_args = "allow"        # format!("{}", x) vs format!("{x}") is fine
+option_if_let_else = "allow"           # if let Some vs let...else is fine
+manual_let_else = "allow"              # if let with return vs let...else is fine

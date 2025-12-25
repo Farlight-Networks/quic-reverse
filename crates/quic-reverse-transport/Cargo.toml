@@ -1,0 +1,27 @@
+[package]
+name = "quic-reverse-transport"
+description = "Transport abstraction layer for quic-reverse"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[features]
+default = ["quinn"]
+quinn = ["dep:quinn"]
+mock = []
+
+[dependencies]
+quinn = { workspace = true, optional = true }
+thiserror = { workspace = true }
+bytes = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+
+[lints]
+workspace = true
