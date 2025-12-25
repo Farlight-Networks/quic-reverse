@@ -1,7 +1,11 @@
 # quic-reverse
 
+[![Crates.io](https://img.shields.io/crates/v/quic-reverse.svg)](https://crates.io/crates/quic-reverse)
+[![Documentation](https://docs.rs/quic-reverse/badge.svg)](https://docs.rs/quic-reverse)
+[![CI](https://github.com/Farlight-Networks/quic-reverse/actions/workflows/ci.yml/badge.svg)](https://github.com/Farlight-Networks/quic-reverse/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
+[![MSRV](https://img.shields.io/badge/MSRV-1.75-blue.svg)](https://www.rust-lang.org/)
+[![Downloads](https://img.shields.io/crates/d/quic-reverse.svg)](https://crates.io/crates/quic-reverse)
 
 A Rust library for reverse-initiated, multiplexed streams over QUIC.
 
