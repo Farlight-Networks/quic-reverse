@@ -13,7 +13,7 @@ quic-reverse helps with the "reverse connection" problem: allowing services behi
 
 ## What can you build with quic-reverse?
 
-quic-reverse is useful whenever a service behind NAT or a firewall needs to accept incoming connections without exposing a public port. Common use cases include:
+quic-reverse is useful whenever a service behind NAT or a firewall needs to accept incoming connections but isn't explicitly exposed to do so. Common use cases include:
 
 - **Remote access tools** - SSH, RDP, or VNC tunneling through restrictive networks
 - **IoT device management** - Push commands to devices that can only make outbound connections
