@@ -10,7 +10,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 rust-version = "1.75"
 license = "Apache-2.0"
@@ -20,9 +20,9 @@ categories = ["network-programming", "asynchronous"]
 
 [workspace.dependencies]
 # Internal crates
-quic-reverse = { version = "0.1.1", path = "crates/quic-reverse" }
-quic-reverse-control = { version = "0.1.1", path = "crates/quic-reverse-control" }
-quic-reverse-transport = { version = "0.1.1", path = "crates/quic-reverse-transport" }
+quic-reverse = { version = "0.1.2", path = "crates/quic-reverse" }
+quic-reverse-control = { version = "0.1.2", path = "crates/quic-reverse-control" }
+quic-reverse-transport = { version = "0.1.2", path = "crates/quic-reverse-transport" }
 
 # Async runtime
 tokio = { version = "1.40", features = ["rt", "rt-multi-thread", "macros", "io-util", "sync", "time"] }
