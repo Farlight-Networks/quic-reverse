@@ -45,7 +45,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt"] }
 
 # Certificate generation (for examples)
-rcgen = "0.13"
+rcgen = "0.14"
 
 # Testing
 tokio-test = "0.4"
