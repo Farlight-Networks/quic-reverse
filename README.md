@@ -153,6 +153,10 @@ Client                              Server
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for design rationale and [PROTOCOL.md](PROTOCOL.md) for wire format details.
 
+### Extensibility
+
+quic-reverse uses an adapter-based design via the `QuicAdapter` trait. While Quinn is the default (and covers the vast majority of Rust QUIC usage), the trait allows implementing support for other QUIC libraries like [quiche](https://github.com/cloudflare/quiche) or [s2n-quic](https://github.com/aws/s2n-quic) if your use case requires it.
+
 ## Configuration
 
 Sessions are configured using `Config`:
