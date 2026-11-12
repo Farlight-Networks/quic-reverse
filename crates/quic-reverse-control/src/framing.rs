@@ -366,8 +366,7 @@ mod tests {
         assert_eq!(encoded.len(), 4); // Just the length prefix
 
         let decoded = decode_frame(&encoded).expect("decode should succeed");
-        assert!(decoded.is_empty());
-    }
+        assert_eq!(decoded, [] as [u8; 0]);    }
 
     #[test]
     fn frame_writer_multiple_frames() {
