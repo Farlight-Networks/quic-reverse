@@ -6,7 +6,6 @@ RelayKit/
 
 # Rust build artifacts
 target/
-Cargo.lock
 
 # IDE
 .idea/
