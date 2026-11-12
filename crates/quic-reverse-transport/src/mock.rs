@@ -91,6 +91,8 @@ impl Connection for MockConnection {
     type OpenError = MockError;
     type AcceptError = MockError;
 
+    // The trait signature is async; this impl body is synchronous.
+    #[allow(clippy::unused_async_trait_impl)]
     async fn open_bi(&self) -> Result<(Self::SendStream, Self::RecvStream), Self::OpenError> {
         let (our_send, their_recv) = mock_stream_pair();
         let (their_send, our_recv) = mock_stream_pair();
@@ -266,6 +268,8 @@ impl AsyncWrite for MockSendStream {
 impl SendStream for MockSendStream {
     type FinishError = io::Error;
 
+    // The trait signature is async; this impl body is synchronous.
+    #[allow(clippy::unused_async_trait_impl)]
     async fn finish(&mut self) -> Result<(), Self::FinishError> {
         let mut buffer = self.buffer.lock().unwrap();
         buffer.finished = true;

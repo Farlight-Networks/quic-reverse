@@ -138,6 +138,8 @@ impl AsyncWrite for QuinnSendStream {
 impl SendStream for QuinnSendStream {
     type FinishError = quinn::ClosedStream;
 
+    // The trait signature is async; this impl body is synchronous.
+    #[allow(clippy::unused_async_trait_impl)]
     async fn finish(&mut self) -> Result<(), Self::FinishError> {
         self.inner.finish()
     }
